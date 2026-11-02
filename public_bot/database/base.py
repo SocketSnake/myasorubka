@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import event
 
-DATABASE_URL = "sqlite+aiosqlite:///data/submeat.db"
+DATABASE_URL = "sqlite+aiosqlite:///data/public_bot.db"
 
 engine = create_async_engine(
     DATABASE_URL, 

@@ -18,27 +18,27 @@ services:
       retries: 3
       start_period: 5s
 
-  submeat_bot:
-    build: ./submeat_bot
-    container_name: submeat_bot
+  public_bot:
+    build: ./public_bot
+    container_name: public_bot
     restart: always
     env_file:
       - .env
     volumes:
-      - ./submeat_bot:/app/bot
+      - ./public_bot:/app/bot
       - ./data/:/app/data
     depends_on:
       redis:
         condition: service_healthy
 
-  mmyaso_bot:
-    build: ./mmyaso_bot
-    container_name: mmyaso_bot
+  admin_bot:
+    build: ./admin_bot
+    container_name: admin_bot
     restart: always
     env_file:
       - .env
     volumes:
-      - ./mmyaso_bot:/app/bot
+      - ./admin_bot:/app/bot
       - ./data:/app/data
       - ./submeat_bot/database:/app/bot/submeat_db
     depends_on:
