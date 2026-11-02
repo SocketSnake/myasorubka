@@ -22,6 +22,17 @@ class User(Base):
     )
 
 
+class Category(Base):
+    __tablename__ = "categories"
+
+    name: Mapped[str] = mapped_column(String(32), nullable=False)
+    desc: Mapped[str] = mapped_column(String(256), nullable=False)
+
+    categories: Mapped[list["Project"]] = relationship(
+        back_populates="category", cascade="all, delete-orphan"
+    )
+
+
 class Project(Base):
     __tablename__ = "projects"
 
@@ -30,6 +41,7 @@ class Project(Base):
     name: Mapped[str] = mapped_column(String(32), nullable=False)
     link: Mapped[str] = mapped_column(Text, nullable=False)
     desc: Mapped[str] = mapped_column(String(256), nullable=False)
+    uniq: Mapped[str] = mapped_column(String(128), nullable=False)
 
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     is_checked: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -41,4 +53,6 @@ class Project(Base):
     )
 
     user: Mapped["User"] = relationship(back_populates="projects")
+    category: Mapped["Category"] = relationship(back_populates="projects")
+
 

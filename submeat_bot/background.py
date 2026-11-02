@@ -55,27 +55,26 @@ async def start_notification_worker(bot: Bot):
                     reason = data["reason"]
                     project_id = data["project_id"]
 
-                    if decision == "approved":
-                        async with async_session_maker() as session:
-                            project = await session.get(Project, project_id)
-                            if project:
+                    async with async_session_maker() as session:
+                        project = await session.get(Project, project_id)
+                        if project:
+
+                            if decision == "approved":
                                 project.is_verified = True if decision == "approved" else False
                                 project.is_checked = True
                                 await session.commit()
-                    else:
-                        async with async_session_maker() as session:
-                            project = await session.get(Project, project_id)
-                            if project:
+
+                            else:
                                 await session.delete(project)
                                 await session.commit()
 
                     if decision == "approved":
 
-                        async with async_session_maker() as session:
-                            queue_number = await get_project_queue_number(session, project_id)
+                        # async with async_session_maker() as session:
+                        #     queue_number = await get_project_queue_number(session, project_id)
 
-                        battle_date = get_battle_date(queue_number)
-                        formatted_date = battle_date.strftime("%d.%m.%Y")
+                        # battle_date = get_battle_date(queue_number)
+                        # formatted_date = battle_date.strftime("%d.%m.%Y")
 
                         # await bot.send_message(user_id, "✅ <b>Проект принят!</b>\n\n" \
                         #                     f"Порядковый номер в очереди: <b>№{queue_number}</b>\n" \
