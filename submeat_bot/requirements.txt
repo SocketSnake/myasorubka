@@ -1,0 +1,8 @@
+pydantic-settings 
+python-dotenv
+aiogram
+redis[hiredis]
+aiohttp-socks
+aiosqlite
+sqlalchemy[asyncio]
+validators
