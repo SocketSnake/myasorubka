@@ -20,8 +20,6 @@ from background import start_notification_worker
 
 async def main():
 
-    os.makedirs("data", exist_ok=True)
-
     logging.basicConfig(level=logging.INFO)
 
     await init_db()
@@ -32,7 +30,7 @@ async def main():
     )
 
     session = AiohttpSession(proxy="socks5://unrybJ:MS5PGU@193.254.235.133:9551")
-    bot = Bot(token=config.submeat_tg_bot_token.get_secret_value(), session=session)
+    bot = Bot(token=config.public_bot_token.get_secret_value(), session=session)
     dp = Dispatcher(storage=storage)
 
     dp.update.middleware(DbSessionMiddleware())

@@ -6,3 +6,4 @@ aiohttp-socks
 aiosqlite
 sqlalchemy[asyncio]
 validators
+asyncpg

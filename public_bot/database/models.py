@@ -25,10 +25,12 @@ class User(Base):
 class Category(Base):
     __tablename__ = "categories"
 
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+
     name: Mapped[str] = mapped_column(String(32), nullable=False)
     desc: Mapped[str] = mapped_column(String(256), nullable=False)
 
-    categories: Mapped[list["Project"]] = relationship(
+    projects: Mapped[list["Project"]] = relationship(
         back_populates="category", cascade="all, delete-orphan"
     )
 
@@ -48,8 +50,12 @@ class Project(Base):
     
     created_at: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())
 
+    # ForeignKeys
     user_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    category_id: Mapped[int] = mapped_column(
+        ForeignKey("categories.id", ondelete="CASCADE"), nullable=False
     )
 
     user: Mapped["User"] = relationship(back_populates="projects")

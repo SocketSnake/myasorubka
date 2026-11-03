@@ -3,10 +3,13 @@ from pydantic import SecretStr
 
 class Settings(BaseSettings):
 
-    submeat_tg_bot_token: SecretStr
+    public_bot_token: SecretStr
 
-    db_login: SecretStr
-    db_password: SecretStr
+    postgres_user: SecretStr
+    postgres_password: SecretStr
+    postgres_host: SecretStr
+    postgres_port: int
+    postgres_db: SecretStr
 
     redis_password: SecretStr
 
