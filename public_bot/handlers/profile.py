@@ -146,6 +146,7 @@ async def process_butt_my_projects(callback: types.CallbackQuery, state: FSMCont
     if not projects:
         await callback.message.answer("🦗 <b>У тебя пока нет ни одного добавленного проекта</b>",
         parse_mode="HTML")
+        await callback.answer()
         return
         
     # 3. Берем первый проект (индекс 0)
