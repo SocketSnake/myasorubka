@@ -11,7 +11,7 @@ from sqlalchemy import select
 from states import ProjectSubmitState
 
 from database.models import User, Project, Category, SubCategory, ProjectStatus, UserStatus
-from database.requests import get_user_project, get_all_categories, get_subcategories_by_category
+from database.requests import get_user_project, get_all_categories, get_subcategories_by_category, get_user_projects_count
 
 import redis.asyncio as aioredis
 
@@ -21,7 +21,7 @@ import validators
 import json
 
 from keyboards import CategoryPagination, SubCategoryPagination, CategorySelect, SubCategorySelect
-from keyboards import get_cancel_keyboard, get_categories_keyboard, get_yes_no_keyboard, get_main_keyboard, get_go_keyboard, get_registration_button
+from keyboards import get_cancel_keyboard, get_categories_keyboard, get_yes_no_keyboard, get_main_keyboard, get_go_keyboard, get_registration_button, get_my_projects_button
 
 
 project_submit_router = Router()
@@ -50,39 +50,37 @@ async def cmd_send_project(message: Message, state: FSMContext, db_session: Asyn
     
     if user.status == UserStatus.READY:
 
-        # проверка на то что чел уже скинул проект
-        project = await get_user_project(db_session, user_id=message.from_user.id)
+        user_project_count = await get_user_projects_count(db_session, user_id=message.from_user.id)
 
-        if project:
-
-            if project.status == ProjectStatus.READY:
-                await message.answer("🕘 <b>Твой проект уже в очереди!</b>\n\nНаберись терпения - скоро он отправится на Мясорубку",
-                                    parse_mode="HTML")
-
-            elif project.status == ProjectStatus.WAIT:
-                await message.answer("⛔️ <b>Твой проект на модерации!</b>",
-                                    parse_mode="HTML")
+        if user_project_count >= 3:
+                
+            await message.answer("⛔️ <b>Ты уже скинул 3 проекта (это максимум)!</b>\n\n"
+                                "Наберись терпения - скоро они отправятся на Мясорубку, и появятся новые слоты",
+                                parse_mode="HTML", reply_markup=get_my_projects_button())
 
         else:
             await state.set_state(ProjectSubmitState.waiting_for_start)
-            await message.answer("<b>Отлично! Начинаем заполнять твою заявку на мясорубку!</b> 🔥",
-                                parse_mode="HTML", 
+            await message.answer("🔥 <b>Отлично! Начинаем оформлять твой проект на Мясорубку</b>\n" \
+                                f"(Доступно слотов: {str(3-user_project_count)} из 3)",
+                                parse_mode="HTML",
                                 reply_markup=get_cancel_keyboard())
 
-            await message.answer("<b>❗️Внимание: эти данные улетят в общий пост на канале</b>, поэтому заполняй всё без ошибок и так, чтобы народ реально хотел за тебя проголосовать", 
+            await message.answer("<b>❗️Внимание: эти данные улетят в общий пост на канале</b>, поэтому заполняй всё без ошибок и так, чтобы народ реально хотел за тебя проголосовать\n\n"
+                                 "🎬 <b>Плюс</b> лучшие и самые интересные проекты могут попасть в видео на YouTube-канале <b><a href='https://www.youtube.com/@frac_chan'>@frac_chan</a></b>!", 
                                 parse_mode="HTML", 
-                                reply_markup=get_go_keyboard())
+                                reply_markup=get_go_keyboard(),
+                                disable_web_page_preview=True)
 
     elif user.status == UserStatus.WAIT:
         await message.answer(
-            "🕘 <b>Ожидай решения модераторов по фейс-контролю</b>",
+            "🕘 <b>Ожидай решения модераторов по регистрации</b>",
             parse_mode="HTML"
             )
 
     elif user.status == UserStatus.FAIL:
 
         await message.answer(
-            "🔄 <b>Давай попробуем пройти фейс-контроль ещё раз?</b>\n\n",
+            "🔄 <b>Давай попробуем пройти регистрацию ещё раз?</b>\n\n",
             parse_mode="HTML",
             reply_markup=get_registration_button()
             )
@@ -99,6 +97,8 @@ async def cmd_send_project(message: Message, state: FSMContext, db_session: Asyn
 @project_submit_router.callback_query(ProjectSubmitState.waiting_for_start, F.data == "go")
 async def process_go(callback: types.CallbackQuery, state: FSMContext, db_session: AsyncSession):
     await state.set_state(ProjectSubmitState.waiting_for_category)
+
+    await state.update_data(submit_type="new")
 
     categories = await get_all_categories(session=db_session);
                 
@@ -314,6 +314,10 @@ async def process_link(message: Message, state: FSMContext):
             await message.answer("❗️ <b>Это не ссылка</b>\n\nПопробуй ещё раз:",
                                 parse_mode="HTML")
 
+    else:
+        await message.answer("❗️ <b>Не увидел ссылку</b>\n\nПопробуй отправить ещё раз:",
+                            parse_mode="HTML")
+
 
 @project_submit_router.message(ProjectSubmitState.waiting_for_subtitle)
 async def process_subtitle(message: Message, state: FSMContext):
@@ -347,7 +351,7 @@ async def process_summary(message: Message, state: FSMContext, db_session: Async
 
         if len(summary) > MAX_PROJ_SUMM_SIZE:
             await message.answer(f"❗️ <b>Слишком много текста (максимум {MAX_PROJ_SUMM_SIZE} симв.)</b>\n\n" \
-                                "Постарайся уложиться в короткое и емкое описание — его увидят подписчики" \
+                                "Постарайся уложиться в короткое и емкое описание — его увидят подписчики\n\n" \
                                 "Попробуй ещё раз:",
                                 parse_mode="HTML")
         elif len(summary) < 15:
@@ -360,6 +364,10 @@ async def process_summary(message: Message, state: FSMContext, db_session: Async
             await state.set_state(ProjectSubmitState.waiting_for_uniq)
             await message.answer("7️⃣ <b>Почему проект крут (в чем его уникальность):</b>",
                         parse_mode="HTML")
+
+    else:
+        await message.answer("❗️ <b>Не увидел текст</b>\n\nПопробуй отправить ещё раз:",
+                            parse_mode="HTML")
 
 
 @project_submit_router.message(ProjectSubmitState.waiting_for_uniq)
@@ -398,64 +406,117 @@ async def process_uniq(message: Message, state: FSMContext, db_session: AsyncSes
                                 f"🔍 Проверь, всё верно?",
                                 parse_mode="HTML", disable_web_page_preview=True, reply_markup=get_yes_no_keyboard())
 
+    else:
+        await message.answer("❗️ <b>Не увидел текст</b>\n\nПопробуй отправить ещё раз:",
+                            parse_mode="HTML")
+
 
 @project_submit_router.callback_query(ProjectSubmitState.waiting_for_check, F.data == "confirm_yes")
 async def process_yes_check_confirm(callback: types.CallbackQuery, state: FSMContext, db_session: AsyncSession):
 
-            user_data = await state.get_data()
-            name = user_data["name"]
-            link = user_data["link"]
-            subtitle = user_data["subtitle"]
-            summ = user_data["summ"]
-            uniq = user_data["uniq"]
+    user_project_count = await get_user_projects_count(db_session, user_id=callback.from_user.id)
 
-            cat_id = user_data["category_id"]
-            scat_id = user_data["sub_category_id"]
+    user_data = await state.get_data()
+    submit_type = user_data["submit_type"]
+    
+    if submit_type == "new" and user_project_count >= 3:
 
-            cat = user_data["category_name"]
-            scat = user_data["sub_category_name"]
+        await state.clear()
 
-            project = Project(
-                name=name,
-                link=link,
-                subtitle=subtitle,
-                summ=summ,
-                uniq=uniq,
-                status=ProjectStatus.WAIT,
-                category_id=cat_id,
-                sub_category_id=scat_id,
-                user_id=callback.from_user.id
-            )
-            db_session.add(project)
-
-            await db_session.commit()
-
-            await state.clear()
-
-            await db_session.refresh(project)
-
-            project_id = project.id
+        await callback.message.delete()
             
-            payload = json.dumps({
-                "_type": "project_submit",
-                "user_id": callback.from_user.id,
-                "username": callback.from_user.username,
-                "project_id": project_id,
-                "name": name,
-                "link": link,
-                "subtitle": subtitle,
-                "summ": summ,
-                "uniq": uniq,
-                "cat": cat,
-                "scat": scat
-            })
-            await redis_client.lpush("public_admin_moder_queue", payload)
+        await callback.message.answer("⛔️ <b>Ты уже скинул 3 проекта (это максимум)!</b>\n\n"
+                            "Наберись терпения - скоро они отправятся на Мясорубку, и появятся новые слоты",
+                            parse_mode="HTML",
+                            reply_markup=get_main_keyboard())
+        await callback.answer()
+        return
 
-            await callback.message.delete()
+    name = user_data["name"]
+    link = user_data["link"]
+    subtitle = user_data["subtitle"]
+    summ = user_data["summ"]
+    uniq = user_data["uniq"]
 
-            await callback.message.answer("⏳ <b>Проект и заявка отправлены на модерацию</b>\n\n",
-                                parse_mode="HTML",
-                                reply_markup=get_main_keyboard())
+    cat_id = user_data["category_id"]
+    scat_id = user_data["sub_category_id"]
+
+    cat = user_data["category_name"]
+    scat = user_data["sub_category_name"]
+
+    if submit_type == "fix":
+
+        project_id = user_data["project_id"]
+
+        project = await db_session.get(Project, project_id)
+
+        if not project or project.user_id != callback.from_user.id:
+            await state.clear()
+            await callback.message.answer("⚠️ Ошибка", reply_markup=get_main_keyboard())
+            return
+        
+        project.name = name
+        project.link = link
+        project.subtitle = subtitle
+        project.summ = summ
+        project.uniq = uniq
+        project.status = ProjectStatus.WAIT 
+        project.category_id = cat_id
+        project.sub_category_id = scat_id
+
+        await db_session.commit()
+        
+    elif submit_type == "new":
+
+        project = Project(
+            name=name,
+            link=link,
+            subtitle=subtitle,
+            summ=summ,
+            uniq=uniq,
+            status=ProjectStatus.WAIT,
+            category_id=cat_id,
+            sub_category_id=scat_id,
+            user_id=callback.from_user.id
+        )
+        db_session.add(project)
+
+        await db_session.commit()
+
+        await db_session.refresh(project)
+
+        project_id = project.id
+
+    else:
+        await callback.message.answer("⚠️ Ошибка сценария", reply_markup=get_main_keyboard())
+        await state.clear()
+        await callback.answer()
+        return
+
+    await state.clear()
+
+    payload = json.dumps({
+        "_type": "project_submit",
+        "user_id": callback.from_user.id,
+        "username": callback.from_user.username,
+        "project_id": project_id,
+        "name": name,
+        "link": link,
+        "subtitle": subtitle,
+        "summ": summ,
+        "uniq": uniq,
+        "cat": cat,
+        "scat": scat
+    })
+    await redis_client.lpush("public_admin_moder_queue", payload)
+
+    await callback.message.delete()
+
+    await callback.message.answer("⏳ <b>Проект отправлен на модерацию</b>\n\n",
+                        parse_mode="HTML",
+                        reply_markup=get_main_keyboard())
+
+    await callback.answer()
 
 
 
@@ -469,3 +530,44 @@ async def process_no_check_confirm(callback: types.CallbackQuery, state: FSMCont
     
     await callback.message.answer("3️⃣ <b>Название проекта:</b>",
                                 parse_mode="HTML", reply_markup=get_cancel_keyboard())
+
+    await callback.answer()
+
+
+@project_submit_router.callback_query(StateFilter(None), F.data.startswith("project_fix:"))
+async def process_project_fix(callback: types.CallbackQuery, state: FSMContext, db_session: AsyncSession):
+
+    project_id = int(callback.data.split(":")[1])
+    project = await db_session.get(Project, project_id)
+
+    if not project:
+        await callback.answer("⚠️ Проект не найден", show_alert=True)
+        return
+
+    if project.user_id == callback.from_user.id and project.status != ProjectStatus.WAIT and project.status != ProjectStatus.ON_BATTLE and project.status != ProjectStatus.POST_BATTLE:
+
+        await state.set_state(ProjectSubmitState.waiting_for_category)
+
+        await state.update_data(submit_type="fix", project_id=project_id)
+        
+        categories = await get_all_categories(session=db_session);
+                    
+        keyboard = get_categories_keyboard(
+            categories=categories, page=0, items_per_page=ITEMS_PER_PAGE
+        )
+        
+        await callback.message.answer("1️⃣ <b>Выбери категорию:</b>", reply_markup=keyboard, parse_mode="HTML")
+
+    elif project.status == ProjectStatus.WAIT:
+        await callback.message.answer("🕘 <b>Пока проект не прошел модерацию его нельзя редактировать</b>", parse_mode="HTML")
+
+    elif project.status == ProjectStatus.ON_BATTLE:
+        await callback.message.answer("⛔️ <b>Проект находится на батле!</b> Его уже нельзя отредактировать", parse_mode="HTML")
+
+    elif project.status == ProjectStatus.POST_BATTLE:
+        await callback.message.answer("⛔️ <b>Проект уже участвовал в батле!</b> Ты можешь закинуть новый", parse_mode="HTML")
+
+    else:
+        await callback.message.answer("⚠️ Ошибка process_project_fix", reply_markup=get_main_keyboard())
+
+    await callback.answer()

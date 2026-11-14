@@ -11,7 +11,7 @@ from sqlalchemy import select, func
 
 import asyncio
 import redis.asyncio as aioredis
-import json
+import json, html
 
 from states import RegRejectedState, ProjSubmitRejectState
 
@@ -19,7 +19,7 @@ from config import config
 
 from public_bot_db.models import User, UserStatus, Project, ProjectStatus
 
-from database.requests import create_moderation_record
+from database.requests import create_reg_moderation_record, create_proj_moderation_record
 
 from keyboards import get_main_sponsr_keyboard
 
@@ -62,7 +62,7 @@ async def process_reg_moderation_callback(callback: CallbackQuery, state: FSMCon
         await redis_client.lpush("admin_public_moder_queue", payload)
 
         status_text = "✅ Одобрено" if decision == "approved" else "❌ Отклонено"
-        await callback.message.edit_text(f"{callback.message.text}\n\n<b>Статус: {status_text}</b>", parse_mode="HTML")
+        await callback.message.edit_text(f"{callback.message.html_text}\n\n<b>Статус: {status_text}</b>", parse_mode="HTML", disable_web_page_preview=True)
         await callback.answer("Решение отправлено!")
 
     elif decision == "rejected":
@@ -71,7 +71,7 @@ async def process_reg_moderation_callback(callback: CallbackQuery, state: FSMCon
         message_id = callback.message.message_id
         
         await state.set_state(RegRejectedState.waiting_for_reason)
-        await state.update_data(user_id=user_id, chat_id=chat_id, msg_id=message_id, msg_text=callback.message.text) 
+        await state.update_data(user_id=user_id, chat_id=chat_id, msg_id=message_id, msg_text=callback.message.html_text) 
 
         await callback.message.answer("📝 <b>Напиши причину:</b>", parse_mode="HTML")
 
@@ -94,7 +94,7 @@ async def process_reg_reason(message: Message, state: FSMContext, db_session: As
             msg_id = user_data["msg_id"]
             msg_text = user_data["msg_text"]
 
-            await create_moderation_record(db_session, user_id, reason)
+            await create_reg_moderation_record(db_session, user_id, reason)
 
             payload = json.dumps({
                 "_type": "registration",
@@ -109,7 +109,8 @@ async def process_reg_reason(message: Message, state: FSMContext, db_session: As
                 chat_id=chat_id,
                 message_id=msg_id,
                 reply_markup=None, 
-                parse_mode="HTML"
+                parse_mode="HTML", 
+                disable_web_page_preview=True
             )
             await message.answer("✅ <b>Принято</b>", parse_mode="HTML")
 
@@ -126,40 +127,42 @@ async def process_projsub_moderation_callback(callback: CallbackQuery, state: FS
 
     project = await db_session.get(Project, project_id)
     if project:
-        if decision == "approved":
-            project.status = ProjectStatus.READY
-        else:
-            await db_session.delete(project)
+        project.status = ProjectStatus.READY if decision == "approved" else ProjectStatus.FAIL
         await db_session.commit()
 
-    if decision == "approved":
+        if decision == "approved":
 
-        payload = json.dumps({
-            "_type": "project_submit",
-            "user_id": user_id,
-            "project_id": project_id,
-            "decision": decision,
-            "reason": ""
-        })
-        await redis_client.lpush("admin_public_moder_queue", payload)
+            payload = json.dumps({
+                "_type": "project_submit",
+                "user_id": user_id,
+                "project_id": project_id,
+                "project_name": project.name,
+                "project_link": project.link,
+                "decision": decision,
+                "reason": ""
+            })
+            await redis_client.lpush("admin_public_moder_queue", payload)
 
-        status_text = "✅ Одобрено" if decision == "approved" else "❌ Отклонено"
-        await callback.message.edit_text(f"{callback.message.text}\n\n<b>Статус: {status_text}</b>", parse_mode="HTML")
-        await callback.answer("Решение отправлено!")
+            status_text = "✅ Одобрено" if decision == "approved" else "❌ Отклонено"
+            await callback.message.edit_text(f"{callback.message.html_text}\n\n<b>Статус: {status_text}</b>", parse_mode="HTML", disable_web_page_preview=True)
+            await callback.answer("Решение отправлено!")
 
-    elif decision == "rejected":
+        elif decision == "rejected":
 
-        chat_id = callback.message.chat.id
-        message_id = callback.message.message_id
-        
-        await state.set_state(ProjSubmitRejectState.waiting_for_reason)
-        await state.update_data(user_id=user_id, chat_id=chat_id, msg_id=message_id, msg_text=callback.message.text, project_id=project_id) 
+            chat_id = callback.message.chat.id
+            message_id = callback.message.message_id
+            
+            await state.set_state(ProjSubmitRejectState.waiting_for_reason)
+            await state.update_data(user_id=user_id, chat_id=chat_id, 
+                                    msg_id=message_id, msg_text=callback.message.html_text, 
+                                    project_id=project_id, project_name=project.name,
+                                    project_link=project.link) 
 
-        await callback.message.answer("📝 <b>Напиши причину:</b>", parse_mode="HTML")
+            await callback.message.answer("📝 <b>Напиши причину:</b>", parse_mode="HTML")
 
 
 @admin_router.message(ProjSubmitRejectState.waiting_for_reason)
-async def process_projsub_reason(message: Message, state: FSMContext):
+async def process_projsub_reason(message: Message, state: FSMContext, db_session: AsyncSession):
 
     if message.text:
 
@@ -176,11 +179,17 @@ async def process_projsub_reason(message: Message, state: FSMContext):
             msg_id = user_data["msg_id"]
             msg_text = user_data["msg_text"]
             project_id = user_data["project_id"]
+            project_name = user_data["project_name"]
+            project_link = user_data["project_link"]
+
+            await create_proj_moderation_record(db_session, project_id, reason)
 
             payload = json.dumps({
                 "_type": "project_submit",
                 "user_id": user_id,
                 "project_id": project_id,
+                "project_name": project_name,
+                "project_link": project_link,
                 "decision": "rejected",
                 "reason": reason
             })

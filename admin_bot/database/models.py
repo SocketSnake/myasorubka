@@ -14,3 +14,12 @@ class RegistrationModeration(Base):
     reason: Mapped[str] = mapped_column(String(300), nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class ProjectsModeration(Base):
+    __tablename__ = "projects_moderation"
+
+    project_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    reason: Mapped[str] = mapped_column(String(300), nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

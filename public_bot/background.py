@@ -1,23 +1,18 @@
 import asyncio
 import json
-import redis.asyncio as aioredis
-from aiogram import Bot
-from sqlalchemy.ext.asyncio import AsyncSession
-from database.base import async_session_maker
-from database.models import User, Project, ProjectStatus, UserStatus
-from config import config
-from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup
-
 import html
 from datetime import datetime, timedelta
 
-from sqlalchemy import select, func
+import redis.asyncio as aioredis
 
-from keyboards import get_main_keyboard, get_retry_registration_keyboard
+from aiogram import Bot
+
+from keyboards import get_retry_registration_keyboard, get_fix_project_button, get_my_projects_button
+from config import config
 
 async def start_notification_worker(bot: Bot):
+    
     redis_client = aioredis.from_url(f"redis://default:{config.redis_password.get_secret_value()}@redis:6379/0")
-    print("🟢 Воркер уведомлений запущен...")
 
     while True:
         try:
@@ -36,10 +31,10 @@ async def start_notification_worker(bot: Bot):
 
                     # Шлем сообщение пользователю
                     if decision == "approved":
-
-                        await bot.send_message(user_id, "🛂 Фейс-контроль пройден!\n\nТеперь ты можешь отправлять свои проекты на мясорубку 📁🥩", reply_markup=get_main_keyboard())
+                        await bot.send_message(user_id, "🛂 Фейс-контроль пройден!\n\nТеперь ты можешь отправлять свои проекты на мясорубку 📁🥩")
                     else:
-                        await bot.send_message(user_id, f"❌ К сожалению, фейс-контроль не пройден:\n\n<blockquote>{reason}</blockquote>", 
+                        await bot.send_message(user_id, f"❌ К сожалению, фейс-контроль не пройден:\n\n<blockquote>{reason}</blockquote>\n\n"
+                                               "Поправь это и попробуй ещё раз 👇", 
                                                parse_mode="HTML",
                                                reply_markup=get_retry_registration_keyboard())
 
@@ -48,35 +43,26 @@ async def start_notification_worker(bot: Bot):
                     user_id = data["user_id"]
                     decision = data["decision"]
                     reason = data["reason"]
+                    project_name = data["project_name"]
+                    project_link = data["project_link"]
                     project_id = data["project_id"]
-
                     
 
+                    project_info = f'<a href="{html.escape(project_link)}">{html.escape(project_name)}</a>'
+
                     if decision == "approved":
-
-                        # async with async_session_maker() as session:
-                        #     queue_number = await get_project_queue_number(session, project_id)
-
-                        # battle_date = get_battle_date(queue_number)
-                        # formatted_date = battle_date.strftime("%d.%m.%Y")
-
-                        # await bot.send_message(user_id, "✅ <b>Проект принят!</b>\n\n" \
-                        #                     f"Порядковый номер в очереди: <b>№{queue_number}</b>\n" \
-                        #                     f"ориентировочная дата батла: <b>{formatted_date} (ВСК)</b>",
-                        #                     parse_mode="HTML",
-                        #                     reply_markup=get_main_keyboard())
-
-                        await bot.send_message(user_id, "✅ <b>Проект принят!</b>",
-                                                parse_mode="HTML",
-                                                reply_markup=get_main_keyboard())
+                        await bot.send_message(user_id, f"✅ <b>Проект {project_info} принят!</b>",
+                                                parse_mode="HTML", 
+                                                reply_markup=get_my_projects_button(),
+                                               disable_web_page_preview=True)
                         
                     else:
-                        await bot.send_message(user_id, f"❌ К сожалению, проект на мясорубку не принят:\n\n<blockquote>{html.escape(reason)}</blockquote>\n\nПопробуй отправить ещё раз", 
+                        await bot.send_message(user_id, f"❌ <b>К сожалению, проект {project_info} не прошёл модерацию</b>:\n\n"
+                                               f"<blockquote>{html.escape(reason)}</blockquote>\n\n"
+                                               "Исправь причину отказа и попробуй ещё раз 👇",
                                                parse_mode="HTML",
-                                               reply_markup=get_main_keyboard())
-
-
-
+                                               reply_markup=get_fix_project_button(project_id=project_id),
+                                               disable_web_page_preview=True)
                     
         except Exception as e:
             print(f"Ошибка в воркере уведомлений: {e}")

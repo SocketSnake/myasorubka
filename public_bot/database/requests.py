@@ -105,7 +105,7 @@ async def update_project(
     if uniq is not None:
         project.uniq = uniq
     if status is not None:
-        project.status = ProjectStatus.RECHECK
+        project.status = ProjectStatus.WAIT
 
     await session.commit()
 
@@ -115,6 +115,15 @@ async def update_project(
 
 
 async def get_user_projects_count(session, user_id: int) -> int:
-    stmt = select(func.count(Project.id)).where(Project.user_id == user_id)
+    stmt = (
+        select(func.count(Project.id))
+        .where(Project.user_id == user_id)
+        .where(Project.status != ProjectStatus.POST_BATTLE)
+        )
     result = await session.execute(stmt)
     return result.scalar_one()
+
+async def get_user_projects(session: AsyncSession, user_id: int) -> list[Project]:
+    stmt = select(Project).where(Project.user_id == user_id)
+    result = await session.execute(stmt)
+    return result.scalars().all()

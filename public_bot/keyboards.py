@@ -190,3 +190,65 @@ async def send_cancel_keyboard(message):
         parse_mode="HTML",
         reply_markup=get_cancel_keyboard()
     )
+
+def get_fix_project_button(project_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔄 Исправить", callback_data=f"project_fix:{project_id}")
+    return builder.as_markup()
+
+
+def get_my_projects_button() -> InlineKeyboardMarkup:
+
+    builder = InlineKeyboardBuilder()
+
+    builder.button(text="📁 Мои Проекты", callback_data="profile_projects")
+    
+    return builder.as_markup()
+
+
+class ProjectPaginationCallback(CallbackData, prefix="proj_page"):
+    index: int  # Индекс проекта в списке (0, 1, 2...)
+
+
+def get_project_keyboard(current_index: int, total_count: int, project_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    
+    # Кнопки навигации (Назад / Вперед) добавляем только если проектов больше одного
+    nav_buttons = []
+    
+    if total_count > 1:
+        # Кнопка "Назад" (если это не первая страница)
+        prev_index = current_index - 1 if current_index > 0 else total_count - 1
+        nav_buttons.append(
+            InlineKeyboardButton(
+                text="◀️ Назад", 
+                callback_data=ProjectPaginationCallback(index=prev_index).pack()
+            )
+        )
+        
+        # Кнопка "Редактировать" (по центру)
+        nav_buttons.append(
+            InlineKeyboardButton(
+                text="✏️ Редактировать", 
+                callback_data=f"project_fix:{project_id}"  
+            )
+        )
+        
+        # Кнопка "Вперед" (если это не последняя страница)
+        next_index = current_index + 1 if current_index < total_count - 1 else 0
+        nav_buttons.append(
+            InlineKeyboardButton(
+                text="Вперед ▶️", 
+                callback_data=ProjectPaginationCallback(index=next_index).pack()
+            )
+        )
+        # Добавляем в ряд
+        builder.row(*nav_buttons)
+    else:
+        # Если проект всего один, показываем только кнопку редактирования
+        builder.button(
+            text="✏️ Редактировать", 
+            callback_data=f"project_fix:{project_id}"
+        )
+        
+    return builder.as_markup()

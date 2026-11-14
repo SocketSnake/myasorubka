@@ -1,11 +1,11 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert
-from database.models import RegistrationModeration
+from database.models import RegistrationModeration, ProjectsModeration
 from sqlalchemy import func
 from public_bot_db.models import ProjectStatus, Project
 from sqlalchemy import select, not_, desc
 
-async def create_moderation_record(session: AsyncSession, user_id: int, reason: str):
+async def create_reg_moderation_record(session: AsyncSession, user_id: int, reason: str):
     # Составляем инструкцию вставки
     stmt = insert(RegistrationModeration).values(
         user_id=user_id,
@@ -14,6 +14,25 @@ async def create_moderation_record(session: AsyncSession, user_id: int, reason: 
     
     stmt = stmt.on_conflict_do_update(
         index_elements=['user_id'],
+        set_={
+            'reason': stmt.excluded.reason,
+            'created_at': func.now()  
+        }
+    )
+    
+    await session.execute(stmt)
+    await session.commit()
+
+
+async def create_proj_moderation_record(session: AsyncSession, project_id: int, reason: str):
+    # Составляем инструкцию вставки
+    stmt = insert(ProjectsModeration).values(
+        project_id=project_id,
+        reason=reason
+    )
+    
+    stmt = stmt.on_conflict_do_update(
+        index_elements=['project_id'],
         set_={
             'reason': stmt.excluded.reason,
             'created_at': func.now()  

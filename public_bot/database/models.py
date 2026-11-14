@@ -10,8 +10,7 @@ from typing import Optional
 class ProjectStatus(str, enum.Enum):
     WAIT = "wait" # ожидает проверки
     READY = "ready" # проверен, ожидает батл
-    # RECHECK = "recheck" # отправлен на повторную проверку
-    FAIL = "fail" # не прошел проверку - сейчас не используется, так как удаляется
+    FAIL = "fail" # не прошел проверку
     ON_BATTLE = "on_battle" # сейчас на батле
     POST_BATTLE = "post_battle" # уже был на батле
 
@@ -21,7 +20,6 @@ class UserStatus(str, enum.Enum):
     WAIT = "wait" # ожидает проверки
     FAIL = "fail" # не прошел проверку
     READY = "ready" # проверен, может кидать преокты
-    # RECHECK = "recheck" # отправлен на повторную проверку
 
 
 class User(Base):

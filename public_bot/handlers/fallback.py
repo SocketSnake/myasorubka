@@ -13,4 +13,4 @@ fallback_router = Router()
 
 @fallback_router.callback_query()
 async def unhandled_callbacks(callback: types.CallbackQuery):
-    await callback.answer("Находится разработке 🚧", show_alert=True)
+    await callback.answer("✋ Недоступно", show_alert=True)
