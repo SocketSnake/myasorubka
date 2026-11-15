@@ -555,6 +555,12 @@ async def process_project_fix(callback: types.CallbackQuery, state: FSMContext, 
         keyboard = get_categories_keyboard(
             categories=categories, page=0, items_per_page=ITEMS_PER_PAGE
         )
+
+        await callback.message.answer(
+            "В любой момент можно прерваться, нажав:\n<b>«❌ Отмена»</b>",
+            parse_mode="HTML",
+            reply_markup=get_cancel_keyboard()
+        )
         
         await callback.message.answer("1️⃣ <b>Выбери категорию:</b>", reply_markup=keyboard, parse_mode="HTML")
 

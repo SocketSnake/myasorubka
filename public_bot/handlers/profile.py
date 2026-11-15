@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from keyboards import send_cancel_keyboard, get_project_keyboard, get_profile_keyboard, get_go_keyboard, get_registration_button, get_retry_registration_keyboard
 from keyboards import ProjectPaginationCallback
 
-from database.models import User, UserStatus, ProjectStatus, Project
+from database.models import User, UserStatus, ProjectStatus, Project, Category, SubCategory
 from database.requests import get_user_projects
 
 import redis.asyncio as aioredis
@@ -113,7 +113,7 @@ async def process_butt_profile_edit(callback: types.CallbackQuery, state: FSMCon
 
 
 
-async def format_project_text(project, db_session, total_count, current_index) -> str:
+async def format_project_text(project: Project, db_session, total_count, current_index) -> str:
 
     header = f"📂 <b>Проект {current_index + 1} из {total_count}</b>\n\n"
 
@@ -123,10 +123,18 @@ async def format_project_text(project, db_session, total_count, current_index) -
     elif project.status == ProjectStatus.ON_BATTLE: status = "на батле 🥩"
     elif project.status == ProjectStatus.POST_BATTLE: status = "после батла 🏖"
 
+    category = await db_session.get(Category, project.category_id)
+    category_name = category.name if category else "Не указана"
+
+    sub_category = await db_session.get(SubCategory, project.sub_category_id)
+    sub_category_name = sub_category.name if sub_category else "Не указана"
+
     TEXT = (
         f'🔢 <b><a href="{html.escape(project.link)}">{html.escape(project.name)} — {html.escape(project.subtitle)}</a></b>\n'
         f"<b>👉 Суть: </b>{html.escape(project.summ)}\n"
         f"<b>🔥 Почему круто: </b>{html.escape(project.uniq)}\n\n"
+        f"<b>📁 Категория: </b>{html.escape(category_name)}\n"
+        f"<b>🏷️ Подкатегория: </b>{html.escape(sub_category_name)}\n\n"
         f"<b>Статус: </b><i>{html.escape(status)}</i>\n"
     )
 
