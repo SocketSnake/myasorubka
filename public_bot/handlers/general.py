@@ -18,11 +18,9 @@ from config import config
 general_router = Router()
 
 @general_router.message(CommandStart())
-async def cmd_start(message: Message, state: FSMContext, db_session: AsyncSession):
+async def cmd_start(message: Message, state: FSMContext, db_session: AsyncSession, user: User):
 
     await state.clear()
-
-    user = await db_session.get(User, message.from_user.id)
         
     if user.status == UserStatus.NEW:
         await message.answer(f"С возвращением!", reply_markup=get_main_keyboard())
@@ -33,5 +31,4 @@ async def cmd_start(message: Message, state: FSMContext, db_session: AsyncSessio
 
 @general_router.message(StateFilter(None), F.text == "🏆 Зал славы")
 async def cmd_hof(message: Message, state: FSMContext, db_session: AsyncSession):
-    user = await db_session.get(User, message.from_user.id)
     await message.answer(f"🔜 Скоро...")

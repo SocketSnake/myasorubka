@@ -26,6 +26,8 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True) # Telegram ID
+    username: Mapped[Optional[str]] = mapped_column(String(32), nullable=True) # Telegram UserName
+
     name: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     portfolio: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     about: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)

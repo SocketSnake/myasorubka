@@ -34,9 +34,7 @@ async def cmd_cancel(message: Message, state: FSMContext):
 
 
 @registration_router.callback_query(StateFilter(None), F.data == "profile_registr")
-async def process_butt_profile_registr(callback: types.CallbackQuery, state: FSMContext, db_session: AsyncSession):
-
-    user = await db_session.get(User, callback.from_user.id)
+async def process_butt_profile_registr(callback: types.CallbackQuery, state: FSMContext, db_session: AsyncSession, user: User):
 
     if user.status == UserStatus.READY:
         await callback.message.answer(
@@ -66,9 +64,7 @@ async def process_butt_profile_registr(callback: types.CallbackQuery, state: FSM
 
 
 @registration_router.callback_query(RegistrationState.waiting_for_start, F.data == "go")
-async def process_go_reg_or_edit(callback: types.CallbackQuery, state: FSMContext, db_session: AsyncSession):
-
-    user = await db_session.get(User, callback.from_user.id)
+async def process_go_reg_or_edit(callback: types.CallbackQuery, state: FSMContext, db_session: AsyncSession, user: User):
 
     if user.status == UserStatus.WAIT:
         await callback.message.answer(
@@ -89,9 +85,7 @@ async def process_go_reg_or_edit(callback: types.CallbackQuery, state: FSMContex
 
 
 @registration_router.callback_query(StateFilter(None), F.data == "retry_registration")
-async def process_retry_registration(callback: types.CallbackQuery, state: FSMContext, db_session: AsyncSession):
-
-    user = await db_session.get(User, callback.from_user.id)
+async def process_retry_registration(callback: types.CallbackQuery, state: FSMContext, db_session: AsyncSession, user: User):
     
     if user.status == UserStatus.WAIT:
         await callback.message.answer(
@@ -158,7 +152,7 @@ async def process_portfolio(message: Message, state: FSMContext):
                             parse_mode="HTML")
 
 @registration_router.message(RegistrationState.waiting_for_about)
-async def process_about(message: Message, state: FSMContext, db_session: AsyncSession):
+async def process_about(message: Message, state: FSMContext, db_session: AsyncSession, user: User):
 
     if message.text:
 
@@ -180,8 +174,6 @@ async def process_about(message: Message, state: FSMContext, db_session: AsyncSe
             portfolio = user_data["portfolio"]
 
             await state.clear()
-
-            user = await db_session.get(User, message.from_user.id)
 
             if user:
                 user.name = name

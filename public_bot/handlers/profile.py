@@ -27,8 +27,7 @@ profile_router = Router()
 
 
 @profile_router.message(StateFilter(None), F.text == "👤 Профиль")
-async def cmd_profile(message: Message, state: FSMContext, db_session: AsyncSession):
-    user = await db_session.get(User, message.from_user.id)
+async def cmd_profile(message: Message, state: FSMContext, db_session: AsyncSession, user: User):
 
     if user.status == UserStatus.NEW:
         await message.answer(f"👤 Сначала нужно зарегистрироваться", 
@@ -81,8 +80,7 @@ async def cmd_profile(message: Message, state: FSMContext, db_session: AsyncSess
 
 
 @profile_router.callback_query(StateFilter(None), F.data == "profile_edit")
-async def process_butt_profile_edit(callback: types.CallbackQuery, state: FSMContext, db_session: AsyncSession):
-    user = await db_session.get(User, callback.from_user.id)
+async def process_butt_profile_edit(callback: types.CallbackQuery, state: FSMContext, db_session: AsyncSession, user: User):
 
     if user.status == UserStatus.NEW:
         await callback.message.answer(

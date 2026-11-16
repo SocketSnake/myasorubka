@@ -34,10 +34,17 @@ class RegisterUserMiddleware(BaseMiddleware):
 
         if event_user and db_session:
             user = await db_session.get(User, event_user.id)
-            if not user:
+            if user:
+
+                if event_user.username and not user.username:
+                    user.username = event_user.username
+                    await db_session.commit()
+
+            else:
                 # 1. Создаем нового пользователя в БД
                 user = User(
                     id=event_user.id,
+                    username=event_user.username,
                     name=None,
                     portfolio=None,
                     about=None,
@@ -68,6 +75,6 @@ class RegisterUserMiddleware(BaseMiddleware):
 
                     return
 
-            data["db_user"] = user
+            data["user"] = user
 
         return await handler(event, data)
